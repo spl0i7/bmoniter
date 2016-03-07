@@ -5,19 +5,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <stdlib.h>
-
-struct iface_stat{ 
-	char iface_name[MAX];
-	long long iface_data_recv;
-	long long iface_data_send;
-	struct iface_stat *next;
-	} ;
-typedef struct iface_stat iface_stat_t; //declare iface_stat_t type data structure.
-void get_iface_name(iface_stat_t *iface_stat);
-int number_of_interface(void);
-void get_iface_data(iface_stat_t *iface_stat);
-void io_error(void);
-
+#include "bmon.h"
 int main(void) {
 	
 	int n_iface=number_of_interface(); // get number of interfaces
@@ -43,7 +31,9 @@ int main(void) {
 		if((iface_stat->iface_data_recv - iface_odata_recv[i])<0){
 			iface_odata_recv[i]=iface_stat->iface_data_recv;
 			}
-		printf("%s : %lld Kbytes %lld Kbps\n",iface_stat->iface_name,(iface_stat->iface_data_recv/1024) , ((iface_stat->iface_data_recv - iface_odata_recv[i])/1024));
+		//printf("Interface \t Received \t DownSpeed \t");
+		printf("%s : %lld KB %lld KBps \n",iface_stat->iface_name,(iface_stat->iface_data_recv/1024) , 
+		((iface_stat->iface_data_recv - iface_odata_recv[i])/1024) );
 		iface_odata_recv[i]=iface_stat->iface_data_recv;
 		iface_stat=iface_stat->next;
 	}
@@ -90,26 +80,12 @@ void get_iface_name(iface_stat_t *iface_stat){
 	fgets(buffer,MAX,statfp);
 	while(fgets(buffer,MAX,statfp)){
 		char *tmp;
-		tmp = strstr(buffer , ":");
-		int u_index=-1;
-			if(tmp) {
-				u_index=tmp-buffer;
-			}
-		int l_index=u_index;
-		if(u_index >0){
-			while( l_index >=0) {
-				if(buffer[l_index] != ' '){
-					l_index--;
-				}
-				else {
-					break;
-				}
-			}
-			l_index++;
-			strncpy(iface_stat->iface_name,buffer+l_index,(u_index-l_index));
-			iface_stat=iface_stat->next;
+		tmp = strstr(buffer , ":"); // return pointer to ":"
+		index_t tmp_index;
+		calculate_iface_name(&tmp_index , buffer  , tmp);
+		strncpy(iface_stat->iface_name,buffer+tmp_index.l_index,(tmp_index.u_index-tmp_index.l_index));
+		iface_stat=iface_stat->next;
 		}
-	}
 	fclose(statfp);
 }
 void get_iface_data(iface_stat_t *iface_stat){
@@ -126,34 +102,62 @@ void get_iface_data(iface_stat_t *iface_stat){
 	while(fgets(buffer,MAX,statfp)){
 		char *tmp;
 		tmp = strstr(buffer , ":");
-		int l_index=-1;
-			if(tmp) {
-				l_index=tmp-buffer;
-			}
-			l_index++;
-		while( l_index >0) {
-			if(buffer[l_index] == ' '){
-				l_index++;
-			}
-			else {
-				break;
-			}
-		}
-		int u_index=l_index;
-		while(u_index>0){
-			if(buffer[u_index]!=' '){
-				u_index++;
-				}
-			else {
-				break;
-				}
-		}
-			strncpy(iface_tmp_data,buffer+l_index,(u_index-l_index));
-			iface_stat->iface_data_recv=atoll(iface_tmp_data);
-			iface_stat=iface_stat->next;
+		index_t tmp_index;
+		calculate_iface_name(&tmp_index , buffer , tmp);
+		tmp_index.l_index=tmp_index.u_index;
+		calculate_iface_data(&tmp_index , buffer , 1);
+		strncpy(iface_tmp_data,buffer+tmp_index.l_index,(tmp_index.u_index-tmp_index.l_index)); //put in received data
+		iface_stat->iface_data_recv=atoll(iface_tmp_data);
+		iface_stat=iface_stat->next;
 		}
 		fclose(statfp);
 	}
 void io_error(void){
+	// Something bad happened
 	perror("Error opening stat file\n");
 	}
+void calculate_iface_name(index_t *tmp_index , char *buffer, char *tmp){ //calculation goes here
+	tmp_index->u_index=-1;
+			if(tmp) {
+				tmp_index->u_index=tmp-buffer;
+			}
+			else {
+				exit(1);
+				}
+		tmp_index->l_index=tmp_index->u_index;
+		if(tmp_index->u_index >0){
+			while( tmp_index->l_index >=0) {
+				if(buffer[tmp_index->l_index] != ' '){
+					tmp_index->l_index--;
+				}
+				else {
+					break;
+				}
+			}
+			tmp_index->l_index++;
+	
+	}
+}
+void calculate_iface_data(index_t *tmp_index , char *buffer, int test_case){
+	while(test_case > 0) {
+	while( tmp_index->l_index >0) {
+			(tmp_index->l_index)++;
+			if(buffer[tmp_index->l_index] == ' '){
+				(tmp_index->l_index)++;
+			}
+			else {
+				break;
+			}
+		}
+		tmp_index->u_index=tmp_index->l_index;
+		while(tmp_index->u_index>0){
+			if(buffer[tmp_index->u_index]!=' '){
+				tmp_index->u_index++;
+				}
+			else {
+				break;
+				}
+		}
+		test_case--;
+	}
+}
