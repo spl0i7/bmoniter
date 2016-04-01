@@ -11,7 +11,7 @@ $ ./bmon
 
 ##TODO
 
-Add sent data and it's speed to output.
+~~Add sent data and it's speed to output.~~
 
 Add ncurses library for better output display.
 
